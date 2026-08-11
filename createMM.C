@@ -1,6 +1,7 @@
 #include "stree.h"
 #include "range.h"
 #include <string> 
+#include <fstream>
 void createMM(){
 
     double H_norm[]  {0.529333E+08  ,0.698070E+08 , 0.901831E+08 ,0.107940E+09   };
@@ -8,6 +9,8 @@ void createMM(){
     double C_norm[] {0.728296E+07 , 0.932229E+07 , 0.112390E+08  , 0.126556E+08 };
     double Cu_norm[]  {0.630032E+06, 0.803934E+06, 0.963260E+06  ,  0.108405E+07 }; 
     range<float> trgRange[4] = {{0.8, 1.4}, {1.8, 3.2}, {11, 13.2}, {58, 61}};
+    range<float> Q2Range = {0.0, 10.0}; 
+    range<float> WRange = {0.5,4};
 
     double normFacs[4][4] = {
         {0.529333E+08  ,0.698070E+08 , 0.901831E+08 ,0.107940E+09   }, 
@@ -19,7 +22,10 @@ void createMM(){
     TString trg[4] = {"H", "ld2", "C", "Cu"}; 
     TString suff[4] = {"rp1","rp2", "rp3", "rp4" }; 
     TString QVals[4] = {"8.5", "7.5", "6.5", "5"};
+    TH1F* histsW[4][4]    = {nullptr};
     TH1F* hists[4][4]= {nullptr}; 
+    TH1F* histsQ2[4][4]   = {nullptr};
+
     TFile* fsim[4][4] ={nullptr}; 
     TFile* fout = new TFile("output.root", "RECREATE"); 
     TString root_dir = "simc_root_files/"; 
@@ -40,20 +46,57 @@ void createMM(){
 
             hists[i][j] = new TH1F(Form("%s_%s", trg[i].Data(), QVals[j].Data()), Form("%s - Q2 = %s", trg[i].Data(), QVals[j].Data()),
              400, trgRange[i].GetMin(), trgRange[i].GetMax());
+
+             histsQ2[i][j] = new TH1F(Form("%s_%s_Q2", trg[i].Data(), QVals[j].Data()),
+                Form("%s - Q2 = %s;Q2;Counts", trg[i].Data(), QVals[j].Data()),
+                400, Q2Range.GetMin(), Q2Range.GetMax());
+              histsW[i][j] = new TH1F(Form("%s_%s_W", trg[i].Data(), QVals[j].Data()),
+                Form("%s - Q2 = %s;W;Counts", trg[i].Data(), QVals[j].Data()),
+                400, WRange.GetMin(), WRange.GetMax());
+
              // now need to loop over the entries of the tree 
 
              Long64_t numEntries = fsim_tree->GetEntries();
              for (Long64_t k = 0; k < numEntries; ++k)
              {
                 fsim_tree->GetEntry(k); 
-                hists[i][j]->Fill(mmnuc, Weight * normFacs[i][j] / 50000); 
-             }
-            hists[i][j]->SetDirectory(fout); 
-            fout->cd(); 
-            hists[i][j]->SetName(Form("%s_%s", trg[i].Data(), QVals[j].Data())); 
-            hists[i][j]->Write(Form("%s_%s", trg[i].Data(), QVals[j].Data()), TObject::kOverwrite);
-            fsim[i][j]->Close(); 
+                double xathgcer = ssxfp + 156.27 * ssxpfp;
+                 double yathgcer = ssyfp + 156.27 * ssypfp;
+        
+                 bool central_hole       = (pow(yathgcer-1.33,2) + pow(xathgcer-0.83,2) >= pow(6.0,2));
+                 bool right_or_left_of_hole = ((yathgcer > 1.33 && (xathgcer < 0. || xathgcer > 3.0)) ||
+                                      (yathgcer < 1.33 && (xathgcer < 0. || xathgcer > 3.0)));
+                    bool remove_region      = central_hole && right_or_left_of_hole;
 
+                if (remove_region) {
+             
+                        hists[i][j]->Fill(mmnuc, Weight * normFacs[i][j] / 50000); 
+                        histsQ2[i][j]->Fill(Q2, Weight * normFacs[i][j] / 50000);
+                histsW[i][j]->Fill(W, Weight * normFacs[i][j] / 50000);
+                     }
+                
+                
+             }
+             /*
+             for (std::size_t i = 0; i < 4 ; ++i ) // 
+             {
+                for (std::size_t j = 0; j < 4; ++j)
+                {
+                    std::cout << hists[i][j]->Integral(); 
+                }
+             }
+                */
+             
+            hists[i][j]->SetDirectory(fout); 
+            histsQ2[i][j]->SetDirectory(fout);
+            histsW[i][j]->SetDirectory(fout);
+            fout->cd(); 
+            hists[i][j]->SetName(Form("%s_%s_MM", trg[i].Data(), QVals[j].Data())); 
+            hists[i][j]->Write(Form("%s_%s_MM", trg[i].Data(), QVals[j].Data()), TObject::kOverwrite);
+            histsQ2[i][j]->Write(histsQ2[i][j]->GetName(), TObject::kOverwrite);
+            histsW[i][j]->Write(histsW[i][j]->GetName(), TObject::kOverwrite);
+            fsim[i][j]->Close(); 
+             
         }
     }
 
