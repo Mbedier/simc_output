@@ -44,6 +44,7 @@ void cprMM()
     }
 
     TCanvas* c1 = new TCanvas("c1", "c1", 1000, 1000); 
+    TLatex *lat = new TLatex(.4,.95,"Missing Energy - 63Cu");
     c1->Divide(2,2); 
     for (int k =0; k< 4; ++k)
     {
